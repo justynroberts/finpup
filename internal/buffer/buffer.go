@@ -7,11 +7,14 @@ import (
 )
 
 type Buffer struct {
-	Lines    []string
-	FilePath string
-	Modified bool
-	CursorX  int
-	CursorY  int
+	Lines      []string
+	FilePath   string
+	Modified   bool
+	CursorX    int
+	CursorY    int
+	SelectMode bool
+	SelectX    int
+	SelectY    int
 }
 
 func New(filePath string) (*Buffer, error) {
@@ -213,4 +216,104 @@ func (b *Buffer) ReplaceCurrentLine(text string) {
 
 func (b *Buffer) GetAllText() string {
 	return strings.Join(b.Lines, "\n")
+}
+
+func (b *Buffer) ToggleSelection() {
+	if b.SelectMode {
+		b.SelectMode = false
+	} else {
+		b.SelectMode = true
+		b.SelectX = b.CursorX
+		b.SelectY = b.CursorY
+	}
+}
+
+func (b *Buffer) HasSelection() bool {
+	return b.SelectMode && (b.SelectX != b.CursorX || b.SelectY != b.CursorY)
+}
+
+func (b *Buffer) GetSelection() string {
+	if !b.HasSelection() {
+		return ""
+	}
+
+	startY, endY := b.SelectY, b.CursorY
+	startX, endX := b.SelectX, b.CursorX
+
+	if startY > endY || (startY == endY && startX > endX) {
+		startY, endY = endY, startY
+		startX, endX = endX, startX
+	}
+
+	if startY == endY {
+		return b.Lines[startY][startX:endX]
+	}
+
+	var result strings.Builder
+	for y := startY; y <= endY; y++ {
+		if y == startY {
+			result.WriteString(b.Lines[y][startX:])
+		} else if y == endY {
+			result.WriteString(b.Lines[y][:endX])
+		} else {
+			result.WriteString(b.Lines[y])
+		}
+		if y < endY {
+			result.WriteString("\n")
+		}
+	}
+
+	return result.String()
+}
+
+func (b *Buffer) ReplaceSelection(text string) {
+	if !b.HasSelection() {
+		return
+	}
+
+	startY, endY := b.SelectY, b.CursorY
+	startX, endX := b.SelectX, b.CursorX
+
+	if startY > endY || (startY == endY && startX > endX) {
+		startY, endY = endY, startY
+		startX, endX = endX, startX
+	}
+
+	newLines := strings.Split(text, "\n")
+
+	if startY == endY {
+		b.Lines[startY] = b.Lines[startY][:startX] + text + b.Lines[startY][endX:]
+		b.CursorY = startY
+		if len(newLines) == 1 {
+			b.CursorX = startX + len(text)
+		} else {
+			b.CursorY = startY + len(newLines) - 1
+			b.CursorX = len(newLines[len(newLines)-1])
+		}
+	} else {
+		before := b.Lines[startY][:startX]
+		after := b.Lines[endY][endX:]
+
+		var newLinesFull []string
+		newLinesFull = append(newLinesFull, b.Lines[:startY]...)
+
+		if len(newLines) == 1 {
+			newLinesFull = append(newLinesFull, before+text+after)
+		} else {
+			newLinesFull = append(newLinesFull, before+newLines[0])
+			if len(newLines) > 2 {
+				newLinesFull = append(newLinesFull, newLines[1:len(newLines)-1]...)
+			}
+			newLinesFull = append(newLinesFull, newLines[len(newLines)-1]+after)
+		}
+
+		newLinesFull = append(newLinesFull, b.Lines[endY+1:]...)
+		b.Lines = newLinesFull
+
+		b.CursorY = startY + len(newLines) - 1
+		b.CursorX = len(newLines[len(newLines)-1])
+	}
+
+	b.SelectMode = false
+	b.Modified = true
 }

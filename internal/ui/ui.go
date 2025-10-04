@@ -170,7 +170,7 @@ func (ui *UI) drawHelpBar() {
 		Background(tcell.ColorBlack).
 		Foreground(tcell.ColorWhite)
 
-	help := " ^S Save | ^Q Quit | ^K DelLine | ^Z Undo | ^T Top | ^B Bottom | ^I Insert/Ovr | ^G Goto | ^A AI | ^E Emoji | ^F Format"
+	help := " ^S Save | ^Q Quit | ^K Del | ^Z Undo | ^T Top | ^B Bottom | ^W Select | ^A AI | ^E Emoji | ^F Format"
 
 	for x := 0; x < ui.width; x++ {
 		ui.screen.SetContent(x, y, ' ', nil, style)
@@ -406,7 +406,16 @@ func (ui *UI) ShowEmojiPicker() (string, bool) {
 	offset := 0
 
 	for {
-		ui.screen.Clear()
+		// Clear with black background
+		defaultStyle := tcell.StyleDefault.
+			Background(tcell.ColorBlack).
+			Foreground(tcell.ColorWhite)
+		for y := 0; y < ui.height; y++ {
+			for x := 0; x < ui.width; x++ {
+				ui.screen.SetContent(x, y, ' ', nil, defaultStyle)
+			}
+		}
+
 		midY := ui.height / 2
 		midX := ui.width / 2
 
@@ -422,12 +431,12 @@ func (ui *UI) ShowEmojiPicker() (string, bool) {
 		startY := midY - boxHeight/2
 
 		style := tcell.StyleDefault.
-			Background(tcell.ColorBlue).
+			Background(tcell.ColorBlack).
 			Foreground(tcell.ColorWhite)
 
 		selectedStyle := tcell.StyleDefault.
 			Background(tcell.ColorWhite).
-			Foreground(tcell.ColorBlue)
+			Foreground(tcell.ColorBlack)
 
 		// Title
 		title := " Emoji Picker (↑↓ navigate, Enter select, Esc cancel) "

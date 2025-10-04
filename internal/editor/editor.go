@@ -91,6 +91,8 @@ func (e *Editor) handleEvent(ev tcell.Event) {
 			e.handleAI()
 		} else if ev.Key() == tcell.KeyCtrlE {
 			e.handleEmojiPicker()
+		} else if ev.Key() == tcell.KeyCtrlW {
+			e.handleToggleSelection()
 		} else if ev.Key() == tcell.KeyCtrlF {
 			e.handleFormat()
 		} else if ev.Key() == tcell.KeyCtrlD {
@@ -213,8 +215,19 @@ func (e *Editor) handleAI() {
 		return
 	}
 
+	// Determine context: selection, or whole document
+	var context string
+	var contextType string
+	if e.buffer.HasSelection() {
+		context = e.buffer.GetSelection()
+		contextType = "selection"
+	} else {
+		context = e.buffer.GetAllText()
+		contextType = "document"
+	}
+
 	// Show prompt with mode selection
-	promptHint := "AI Prompt (^I=insert ^R=replace ^O=overwrite):"
+	promptHint := fmt.Sprintf("AI Prompt [%s] (^I=insert ^R=replace ^O=overwrite):", contextType)
 
 	prompt, mode, ok := e.ui.ShowAIPrompt(promptHint)
 	if !ok {
@@ -242,7 +255,6 @@ func (e *Editor) handleAI() {
 	e.ui.SetStatus("Generating AI response...")
 	e.ui.Draw()
 
-	context := e.buffer.GetCurrentLine()
 	result, err := e.aiClient.GenerateText(prompt, context)
 	if err != nil {
 		e.ui.SetStatus(fmt.Sprintf("AI error: %v", err))
@@ -253,8 +265,17 @@ func (e *Editor) handleAI() {
 
 	switch mode {
 	case "replace":
-		e.buffer.ReplaceCurrentLine(result)
-		e.ui.SetStatus("Line replaced with AI response")
+		if e.buffer.HasSelection() {
+			e.buffer.ReplaceSelection(result)
+			e.ui.SetStatus("Selection replaced with AI response")
+		} else {
+			// Replace entire buffer
+			e.buffer.Lines = strings.Split(result, "\n")
+			e.buffer.CursorY = 0
+			e.buffer.CursorX = 0
+			e.buffer.Modified = true
+			e.ui.SetStatus("Document replaced with AI response")
+		}
 	case "overwrite":
 		// Clear entire buffer and insert AI response
 		e.buffer.Lines = strings.Split(result, "\n")
@@ -266,6 +287,9 @@ func (e *Editor) handleAI() {
 		e.buffer.InsertText("\n" + result)
 		e.ui.SetStatus("AI response inserted")
 	}
+
+	// Clear selection after AI operation
+	e.buffer.SelectMode = false
 }
 
 func (e *Editor) handleEmojiPicker() {
@@ -462,5 +486,14 @@ func (e *Editor) toggleInsertMode() {
 		e.ui.SetStatus("INSERT mode")
 	} else {
 		e.ui.SetStatus("OVERWRITE mode")
+	}
+}
+
+func (e *Editor) handleToggleSelection() {
+	e.buffer.ToggleSelection()
+	if e.buffer.SelectMode {
+		e.ui.SetStatus("Selection mode ON - move cursor to select")
+	} else {
+		e.ui.SetStatus("Selection mode OFF")
 	}
 }
