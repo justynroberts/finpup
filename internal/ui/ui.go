@@ -7,13 +7,11 @@ import (
 	"github.com/gdamore/tcell/v2"
 	"github.com/justynroberts/finpup/internal/buffer"
 	"github.com/justynroberts/finpup/internal/highlight"
-	"github.com/justynroberts/finpup/pkg/themes"
 )
 
 type UI struct {
 	screen      tcell.Screen
 	buffer      *buffer.Buffer
-	theme       themes.Theme
 	highlighter *highlight.Highlighter
 	offsetY     int
 	width       int
@@ -21,7 +19,7 @@ type UI struct {
 	statusMsg   string
 }
 
-func New(buf *buffer.Buffer, theme themes.Theme) (*UI, error) {
+func New(buf *buffer.Buffer) (*UI, error) {
 	screen, err := tcell.NewScreen()
 	if err != nil {
 		return nil, err
@@ -36,7 +34,6 @@ func New(buf *buffer.Buffer, theme themes.Theme) (*UI, error) {
 	ui := &UI{
 		screen:      screen,
 		buffer:      buf,
-		theme:       theme,
 		highlighter: highlight.New(buf.FilePath),
 		offsetY:     0,
 		width:       width,
@@ -45,8 +42,8 @@ func New(buf *buffer.Buffer, theme themes.Theme) (*UI, error) {
 	}
 
 	screen.SetStyle(tcell.StyleDefault.
-		Background(theme.Background).
-		Foreground(theme.Foreground))
+		Background(tcell.ColorBlack).
+		Foreground(tcell.ColorWhite))
 	screen.Clear()
 
 	return ui, nil
@@ -54,13 +51,6 @@ func New(buf *buffer.Buffer, theme themes.Theme) (*UI, error) {
 
 func (ui *UI) Close() {
 	ui.screen.Fini()
-}
-
-func (ui *UI) SetTheme(theme themes.Theme) {
-	ui.theme = theme
-	ui.screen.SetStyle(tcell.StyleDefault.
-		Background(theme.Background).
-		Foreground(theme.Foreground))
 }
 
 func (ui *UI) Draw() {
@@ -104,8 +94,8 @@ func (ui *UI) Draw() {
 func (ui *UI) drawLine(screenY, lineNum int) {
 	lineNumStr := fmt.Sprintf("%3d ", lineNum+1)
 	style := tcell.StyleDefault.
-		Background(ui.theme.Background).
-		Foreground(ui.theme.LineNumFG)
+		Background(tcell.ColorBlack).
+		Foreground(tcell.ColorGray)
 
 	for i, r := range lineNumStr {
 		ui.screen.SetContent(i, screenY, r, nil, style)
@@ -116,8 +106,8 @@ func (ui *UI) drawLine(screenY, lineNum int) {
 	if err != nil || len(styledRunes) == 0 {
 		// Fallback to plain text
 		style := tcell.StyleDefault.
-			Background(ui.theme.Background).
-			Foreground(ui.theme.Foreground)
+			Background(tcell.ColorBlack).
+			Foreground(tcell.ColorWhite)
 		for i, r := range line {
 			if 4+i >= ui.width {
 				break
@@ -132,7 +122,7 @@ func (ui *UI) drawLine(screenY, lineNum int) {
 			break
 		}
 		style := tcell.StyleDefault.
-			Background(ui.theme.Background).
+			Background(tcell.ColorBlack).
 			Foreground(sr.Color)
 		ui.screen.SetContent(4+i, screenY, sr.Rune, nil, style)
 	}
@@ -141,8 +131,8 @@ func (ui *UI) drawLine(screenY, lineNum int) {
 func (ui *UI) drawStatusBar() {
 	y := ui.height - 2
 	style := tcell.StyleDefault.
-		Background(ui.theme.StatusBG).
-		Foreground(ui.theme.StatusFG)
+		Background(tcell.ColorBlue).
+		Foreground(tcell.ColorWhite)
 
 	// Clear status bar
 	for x := 0; x < ui.width; x++ {
@@ -177,10 +167,10 @@ func (ui *UI) drawStatusBar() {
 func (ui *UI) drawHelpBar() {
 	y := ui.height - 1
 	style := tcell.StyleDefault.
-		Background(ui.theme.Background).
-		Foreground(ui.theme.Foreground)
+		Background(tcell.ColorBlack).
+		Foreground(tcell.ColorWhite)
 
-	help := " ^S Save | ^Q Quit | ^K DelLine | ^Z Undo | ^T Top | ^B Bottom | ^I Insert/Ovr | ^G Goto | ^A AI | ^H Theme | ^F Format"
+	help := " ^S Save | ^Q Quit | ^K DelLine | ^Z Undo | ^T Top | ^B Bottom | ^I Insert/Ovr | ^G Goto | ^A AI | ^E Emoji | ^F Format"
 
 	for x := 0; x < ui.width; x++ {
 		ui.screen.SetContent(x, y, ' ', nil, style)
@@ -217,8 +207,8 @@ func (ui *UI) ShowPrompt(prompt string) (string, bool) {
 	startX := midX - boxWidth/2
 
 	style := tcell.StyleDefault.
-		Background(ui.theme.StatusBG).
-		Foreground(ui.theme.StatusFG)
+		Background(tcell.ColorBlue).
+		Foreground(tcell.ColorWhite)
 
 	// Draw prompt text
 	for i, r := range prompt {
@@ -298,8 +288,8 @@ func (ui *UI) ShowAIPrompt(prompt string) (string, string, bool) {
 	startX := midX - boxWidth/2
 
 	style := tcell.StyleDefault.
-		Background(ui.theme.StatusBG).
-		Foreground(ui.theme.StatusFG)
+		Background(tcell.ColorBlue).
+		Foreground(tcell.ColorWhite)
 
 	mode := "insert"
 	modeText := "[INSERT]"
@@ -364,6 +354,151 @@ func (ui *UI) ShowAIPrompt(prompt string) (string, string, bool) {
 				input.WriteRune(ev.Rune())
 				input.WriteString(s[cursorPos:])
 				cursorPos++
+			}
+		}
+	}
+}
+
+// ShowEmojiPicker shows a scrollable emoji picker
+func (ui *UI) ShowEmojiPicker() (string, bool) {
+	emojis := []struct {
+		emoji string
+		name  string
+	}{
+		{"😀", "grinning"}, {"😃", "smiley"}, {"😄", "smile"}, {"😁", "grin"},
+		{"😆", "laughing"}, {"😅", "sweat_smile"}, {"🤣", "rofl"}, {"😂", "joy"},
+		{"🙂", "slightly_smiling"}, {"🙃", "upside_down"}, {"😉", "wink"}, {"😊", "blush"},
+		{"😇", "innocent"}, {"🥰", "smiling_hearts"}, {"😍", "heart_eyes"}, {"🤩", "star_struck"},
+		{"😘", "kissing_heart"}, {"😗", "kissing"}, {"😚", "kissing_closed_eyes"}, {"😙", "kissing_smiling_eyes"},
+		{"🥲", "smiling_tear"}, {"😋", "yum"}, {"😛", "stuck_out_tongue"}, {"😜", "stuck_out_tongue_winking"},
+		{"🤪", "zany"}, {"😝", "stuck_out_tongue_closed_eyes"}, {"🤑", "money_mouth"}, {"🤗", "hugs"},
+		{"🤭", "hand_over_mouth"}, {"🤫", "shushing"}, {"🤔", "thinking"}, {"🤐", "zipper_mouth"},
+		{"🤨", "raised_eyebrow"}, {"😐", "neutral"}, {"😑", "expressionless"}, {"😶", "no_mouth"},
+		{"😏", "smirk"}, {"😒", "unamused"}, {"🙄", "roll_eyes"}, {"😬", "grimacing"},
+		{"🤥", "lying"}, {"😌", "relieved"}, {"😔", "pensive"}, {"😪", "sleepy"},
+		{"🤤", "drooling"}, {"😴", "sleeping"}, {"😷", "mask"}, {"🤒", "thermometer"},
+		{"🤕", "head_bandage"}, {"🤢", "nauseated"}, {"🤮", "vomiting"}, {"🤧", "sneezing"},
+		{"🥵", "hot"}, {"🥶", "cold"}, {"😵", "dizzy"}, {"🤯", "exploding_head"},
+		{"😎", "sunglasses"}, {"🤓", "nerd"}, {"🧐", "monocle"}, {"😕", "confused"},
+		{"😟", "worried"}, {"🙁", "frowning"}, {"☹️", "frowning2"}, {"😮", "open_mouth"},
+		{"😯", "hushed"}, {"😲", "astonished"}, {"😳", "flushed"}, {"🥺", "pleading"},
+		{"😦", "frowning_open"}, {"😧", "anguished"}, {"😨", "fearful"}, {"😰", "anxious_sweat"},
+		{"😥", "sad_sweat"}, {"😢", "cry"}, {"😭", "sob"}, {"😱", "scream"},
+		{"😖", "confounded"}, {"😣", "persevere"}, {"😞", "disappointed"}, {"😓", "sweat"},
+		{"😩", "weary"}, {"😫", "tired"}, {"🥱", "yawn"}, {"😤", "triumph"},
+		{"😡", "rage"}, {"😠", "angry"}, {"🤬", "cursing"}, {"👍", "thumbsup"},
+		{"👎", "thumbsdown"}, {"👌", "ok_hand"}, {"✌️", "victory"}, {"🤞", "crossed_fingers"},
+		{"🤟", "love_you"}, {"🤘", "metal"}, {"👋", "wave"}, {"🤚", "raised_back_hand"},
+		{"👏", "clap"}, {"🙌", "raised_hands"}, {"👐", "open_hands"}, {"🤲", "palms_up"},
+		{"🙏", "pray"}, {"✍️", "writing"}, {"💪", "muscle"}, {"🦾", "mechanical_arm"},
+		{"❤️", "heart"}, {"🧡", "orange_heart"}, {"💛", "yellow_heart"}, {"💚", "green_heart"},
+		{"💙", "blue_heart"}, {"💜", "purple_heart"}, {"🖤", "black_heart"}, {"🤍", "white_heart"},
+		{"💔", "broken_heart"}, {"❤️‍🔥", "heart_on_fire"}, {"💯", "100"}, {"💢", "anger"},
+		{"💥", "boom"}, {"💫", "dizzy_symbol"}, {"💦", "sweat_drops"}, {"💨", "dash"},
+		{"🔥", "fire"}, {"✨", "sparkles"}, {"⭐", "star"}, {"🌟", "star2"},
+		{"💤", "zzz"}, {"🚀", "rocket"}, {"🎉", "tada"}, {"🎊", "confetti"},
+		{"✅", "check"}, {"❌", "x"}, {"⚠️", "warning"}, {"🔔", "bell"},
+		{"📌", "pin"}, {"📍", "location"}, {"💡", "bulb"}, {"🔒", "lock"},
+		{"🔓", "unlock"}, {"🔑", "key"}, {"🎯", "dart"}, {"💰", "moneybag"},
+	}
+
+	selected := 0
+	offset := 0
+
+	for {
+		ui.screen.Clear()
+		midY := ui.height / 2
+		midX := ui.width / 2
+
+		boxWidth := 70
+		boxHeight := 15
+		if boxWidth > ui.width-4 {
+			boxWidth = ui.width - 4
+		}
+		if boxHeight > ui.height-4 {
+			boxHeight = ui.height - 4
+		}
+		startX := midX - boxWidth/2
+		startY := midY - boxHeight/2
+
+		style := tcell.StyleDefault.
+			Background(tcell.ColorBlue).
+			Foreground(tcell.ColorWhite)
+
+		selectedStyle := tcell.StyleDefault.
+			Background(tcell.ColorWhite).
+			Foreground(tcell.ColorBlue)
+
+		// Title
+		title := " Emoji Picker (↑↓ navigate, Enter select, Esc cancel) "
+		for i, r := range title {
+			if i >= boxWidth {
+				break
+			}
+			ui.screen.SetContent(startX+i, startY, r, nil, style)
+		}
+
+		// Display emojis
+		perRow := (boxWidth - 2) / 8
+		visibleRows := boxHeight - 2
+
+		if offset > selected/perRow {
+			offset = selected / perRow
+		}
+		if selected/perRow >= offset+visibleRows {
+			offset = selected/perRow - visibleRows + 1
+		}
+
+		for i := 0; i < visibleRows*perRow && offset*perRow+i < len(emojis); i++ {
+			idx := offset*perRow + i
+			if idx >= len(emojis) {
+				break
+			}
+
+			row := i / perRow
+			col := i % perRow
+
+			emojiStr := fmt.Sprintf(" %s ", emojis[idx].emoji)
+
+			currentStyle := style
+			if idx == selected {
+				currentStyle = selectedStyle
+			}
+
+			x := startX + 1 + col*8
+			y := startY + 1 + row
+
+			for j, r := range emojiStr {
+				ui.screen.SetContent(x+j, y, r, nil, currentStyle)
+			}
+		}
+
+		ui.screen.Show()
+
+		ev := ui.screen.PollEvent()
+		switch ev := ev.(type) {
+		case *tcell.EventKey:
+			switch ev.Key() {
+			case tcell.KeyEnter:
+				return emojis[selected].emoji, true
+			case tcell.KeyEscape:
+				return "", false
+			case tcell.KeyUp:
+				if selected >= perRow {
+					selected -= perRow
+				}
+			case tcell.KeyDown:
+				if selected+perRow < len(emojis) {
+					selected += perRow
+				}
+			case tcell.KeyLeft:
+				if selected > 0 {
+					selected--
+				}
+			case tcell.KeyRight:
+				if selected < len(emojis)-1 {
+					selected++
+				}
 			}
 		}
 	}

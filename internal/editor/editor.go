@@ -12,7 +12,6 @@ import (
 	"github.com/justynroberts/finpup/internal/config"
 	"github.com/justynroberts/finpup/internal/highlight"
 	"github.com/justynroberts/finpup/internal/ui"
-	"github.com/justynroberts/finpup/pkg/themes"
 )
 
 type Editor struct {
@@ -22,7 +21,6 @@ type Editor struct {
 	aiClient     *ai.Client
 	clipboard    string
 	running      bool
-	currentTheme themes.Theme
 	undoStack    [][]string
 	aiPromptHistory []string
 	lastAIPrompt string
@@ -40,9 +38,7 @@ func New(filePath string) (*Editor, error) {
 		return nil, fmt.Errorf("failed to create buffer: %w", err)
 	}
 
-	currentTheme := themes.GetTheme(cfg.Theme.Current)
-
-	ui, err := ui.New(buf, currentTheme)
+	ui, err := ui.New(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create UI: %w", err)
 	}
@@ -54,7 +50,6 @@ func New(filePath string) (*Editor, error) {
 		aiClient:     ai.New(&cfg.AI),
 		clipboard:    "",
 		running:      true,
-		currentTheme: currentTheme,
 		undoStack:    make([][]string, 0, 50),
 		aiPromptHistory: make([]string, 0, 20),
 		lastAIPrompt: "",
@@ -94,8 +89,8 @@ func (e *Editor) handleEvent(ev tcell.Event) {
 			e.handleCut()
 		} else if ev.Key() == tcell.KeyCtrlA {
 			e.handleAI()
-		} else if ev.Key() == tcell.KeyCtrlH {
-			e.handleThemeToggle()
+		} else if ev.Key() == tcell.KeyCtrlE {
+			e.handleEmojiPicker()
 		} else if ev.Key() == tcell.KeyCtrlF {
 			e.handleFormat()
 		} else if ev.Key() == tcell.KeyCtrlD {
@@ -273,12 +268,18 @@ func (e *Editor) handleAI() {
 	}
 }
 
-func (e *Editor) handleThemeToggle() {
-	e.currentTheme = themes.NextTheme(e.currentTheme.Name)
-	e.ui.SetTheme(e.currentTheme)
-	e.config.Theme.Current = e.currentTheme.Name
-	config.Save(e.config)
-	e.ui.SetStatus(fmt.Sprintf("Theme: %s", e.currentTheme.Name))
+func (e *Editor) handleEmojiPicker() {
+	emoji, ok := e.ui.ShowEmojiPicker()
+	if !ok || emoji == "" {
+		e.ui.SetStatus("Emoji cancelled")
+		return
+	}
+
+	e.saveUndo()
+	for _, r := range emoji {
+		e.buffer.InsertRune(r)
+	}
+	e.ui.SetStatus(fmt.Sprintf("Inserted emoji: %s", emoji))
 }
 
 func (e *Editor) handleFormat() {
