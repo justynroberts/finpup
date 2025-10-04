@@ -10,7 +10,7 @@ Download the latest release for your platform from [Releases](https://github.com
 
 **macOS/Linux:**
 ```bash
-curl -L https://github.com/justynroberts/finpup/releases/latest/download/finpup-$(uname -s)-$(uname -m) -o finpup
+curl -L https://github.com/justynroberts/finpup/releases/latest/download/finpup -o finpup
 chmod +x finpup
 sudo mv finpup /usr/local/bin/
 ```
