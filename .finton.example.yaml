@@ -1,0 +1,17 @@
+# Finton Text Editor Configuration
+# Copy to ~/.finton.yaml and customize
+
+ai:
+  enabled: false              # Enable AI assistance (Ctrl+A)
+  provider: ollama           # "ollama" or "openai"
+  base_url: http://localhost:11434   # Ollama endpoint or OpenAI-compatible API
+  model: llama3.2            # Model name
+  api_key: ""                # API key for OpenAI (leave empty for Ollama)
+
+theme:
+  current: dark              # dark, light, monokai, solarized
+
+editor:
+  tab_size: 4
+  show_line_numbers: true
+  auto_indent: true

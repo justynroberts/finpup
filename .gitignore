@@ -1,0 +1,47 @@
+# Binaries
+finton
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+dist/
+
+# Test binary
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Dependency directories
+vendor/
+
+# Go workspace file
+go.work
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+
+# Config (except example)
+.finton.yaml
+finpup
+
+# Config
+.finpup.yaml
+
+# Temporary test files
+test.txt
+hello.txt
+test_sample.json
+
+# Build documentation
+BUILD_COMPLETE.md
+PROJECT_SUMMARY.md
